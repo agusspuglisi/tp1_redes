@@ -1,0 +1,25 @@
+# pip install flake8
+# pip install autopep8
+
+# # Desde la raíz del proyecto:
+# flake8 src/ --config=.flake8 # Linter
+# autopep8 --in-place --aggressive --recursive ./ # Formateador
+
+
+[flake8]
+# PEP8 Configuration
+max-line-length = 120
+ignore = 
+    E203,  # Whitespace before ':' (allowed in some cases)
+    W503,  # Line break before binary operator (allowed by PEP8)
+    E266,  # Too many leading '#' for block comment
+exclude = 
+    .git,
+    __pycache__,
+    venv,
+    migrations,
+    scripts,
+    docs
+per-file-ignores =
+    # Allow * imports in __init__.py
+    __init__.py: F403,F401
