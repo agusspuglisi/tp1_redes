@@ -40,4 +40,5 @@ def parse_args_client(command_type):
 
     parser.add_argument('-r', '--protocol', help='error recovery protocol')
 
-    return parser
+    args = parser.parse_args()
+    return args
