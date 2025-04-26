@@ -1,9 +1,8 @@
 from lib.args_parser import parse_args_client
-import lib.client as client
-
+from lib.client import upload_file
+   
 def main():
     args = parse_args_client("upload")
-    client.run_client(args, "upload")
-
+    upload_file(args)
 if __name__ == "__main__":
     main()

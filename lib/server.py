@@ -1,7 +1,67 @@
 import socket
+import os
+import logging
 
 def run_server(args):
     host, port = args.host, args.port #args.storage, args.protocol
+    
+    setup_logging(args)
+    validate_storage(args.storage)
+    
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_socket:
-        s_socket.bind((host, port))
-        print("Server started on {}:{}".format(host, port))
+        try:
+            s_socket.bind((host, port))
+            print("Server started on {}:{}".format(host, port))
+            
+            while True:
+                data, addr = s_socket.recvfrom(1024)
+                handle_request(s_socket, data, addr, args.storage)
+                
+        except Exception as e:
+            logging.error(f"Server error: {str(e)}")
+
+def handle_request(sock, data, addr, storage_dir):
+    try:
+        if data.startswith(b"UPLOAD"):
+            filename = data[6:].decode()
+            start_upload(sock, addr, filename, storage_dir)
+            
+        elif data.startswith(b"DOWNLOAD"):
+            filename = data[8:].decode()
+            start_download(sock, addr, filename, storage_dir)
+            
+    except Exception as e:
+        logging.error(f"Request handling error: {str(e)}")
+
+def start_upload(sock, addr, filename, storage_dir):
+    filepath = os.path.join(storage_dir, filename)
+    sock.sendto(b"READY", addr)
+    
+    with open(filepath, 'wb') as f:
+        while True:
+            data, _ = sock.recvfrom(1024)
+            if data == b"EOF":
+                break
+            f.write(data)
+
+def start_download(sock, addr, filename, storage_dir):
+    filepath = os.path.join(storage_dir, filename)
+    if not os.path.exists(filepath):
+        sock.sendto(b"NOTFOUND", addr)
+        return
+        
+    sock.sendto(b"FOUND", addr)
+    with open(filepath, 'rb') as f:
+        while (chunk := f.read(1024)):
+            sock.sendto(chunk, addr)
+    sock.sendto(b"EOF", addr)
+
+def setup_logging(args):
+    level = logging.INFO if not args.quiet else logging.WARNING
+    if args.verbose: level = logging.DEBUG
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=level)
+
+def validate_storage(path):
+    os.makedirs(path, exist_ok=True)
+    if not os.path.isdir(path):
+        raise ValueError(f"Invalid storage path: {path}")
