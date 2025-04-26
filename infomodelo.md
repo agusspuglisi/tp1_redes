@@ -23,3 +23,11 @@ Client                  Server
   | <----- DATA Chunk 1 --- |
   | <----- DATA Chunk 2 --- |
   | <-------- EOF --------- |
+
+
+UPLOAD  	    b'UPLOAD ' + filename.encode()	
+DOWNLOAD	    b'DOWNLOAD ' + filename.encode()
+READY	        b'READY'
+FOUND	        b'FOUND'
+NOTFOUND	    b'NOTFOUND'
+EOF	            b'EOF'	
