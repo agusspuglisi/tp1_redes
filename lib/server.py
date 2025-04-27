@@ -1,12 +1,14 @@
 import socket
 import os
 import logging
+import threading
 
 def run_server(args):
-    host, port = args.host, args.port #args.storage, args.protocol
+    host, port = args.host, args.port
+    storage, protocol = args.storage, args.protocol
     
     setup_logging(args)
-    validate_storage(args.storage)
+    validate_storage(storage)
     
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_socket:
         try:
@@ -15,26 +17,36 @@ def run_server(args):
             
             while True:
                 data, addr = s_socket.recvfrom(1024)
-                handle_request(s_socket, data, addr, args.storage)
-                
+                client_thread = threading.Thread(target=server_handle_request, args=(s_socket, data, addr, storage, protocol))
+                client_thread.start()
+           
         except Exception as e:
             logging.error(f"Server error: {str(e)}")
 
-def handle_request(sock, data, addr, storage_dir):
+def server_handle_request(sock, data, addr, storage_dir, protocol):
     try:
         if data.startswith(b"UPLOAD"):
             filename = data[6:].decode()
-            start_upload(sock, addr, filename, storage_dir)
+            filepath = os.path.join(storage_dir, filename)
+            # if protocol == 'saw':
+            #     stop_and_wait_receive(sock, addr, filepath)
+            # else if protocol == "sr":
+            #     selective_repeat_receive(sock, addr, filepath)
+            start_upload(sock, addr, filepath) # Esto no iria
             
         elif data.startswith(b"DOWNLOAD"):
             filename = data[8:].decode()
-            start_download(sock, addr, filename, storage_dir)
+            filepath = os.path.join(storage_dir, filename)
+            # if protocol == 'saw':
+            #     stop_and_wait_send(sock, addr, filepath)
+            # else if protocol == "sr":
+            #     selective_repeat_send(sock, addr, filepath)
+            start_download(sock, addr, filepath) # Esto tampoco
             
     except Exception as e:
         logging.error(f"Request handling error: {str(e)}")
 
-def start_upload(sock, addr, filename, storage_dir):
-    filepath = os.path.join(storage_dir, filename)
+def start_upload(sock, addr, filepath):
     sock.sendto(b"READY", addr)
     
     with open(filepath, 'wb') as f:
@@ -44,8 +56,7 @@ def start_upload(sock, addr, filename, storage_dir):
                 break
             f.write(data)
 
-def start_download(sock, addr, filename, storage_dir):
-    filepath = os.path.join(storage_dir, filename)
+def start_download(sock, addr, filepath):
     if not os.path.exists(filepath):
         sock.sendto(b"NOTFOUND", addr)
         return
