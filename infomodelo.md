@@ -8,26 +8,32 @@
 | `EOF`     | Both Directions | None             | End of transmission              |
 
 
+### File Upload
+```
 Client                  Server
   | -- UPLOAD file.txt --> |
   | <------- READY ------- |
   | ---- DATA Chunk 1 ---> |
   | ---- DATA Chunk 2 ---> |
   | --------- EOF -------> |
+```
 
-
-
-  Client                  Server
+### File Download
+```
+Client                  Server
   | -- DOWNLOAD file.txt -> |
   | <------- FOUND ------- |
   | <----- DATA Chunk 1 --- |
   | <----- DATA Chunk 2 --- |
   | <-------- EOF --------- |
+```
 
 
-UPLOAD  	    b'UPLOAD ' + filename.encode()	
-DOWNLOAD	    b'DOWNLOAD ' + filename.encode()
-READY	        b'READY'
-FOUND	        b'FOUND'
-NOTFOUND	    b'NOTFOUND'
-EOF	            b'EOF'	
+| Command       | Format                                  |
+|---------------|-----------------------------------------|
+| **UPLOAD**    | `b'UPLOAD ' + filename.encode()`        |
+| **DOWNLOAD**  | `b'DOWNLOAD ' + filename.encode()`      |
+| **READY**     | `b'READY'`                              |
+| **FOUND**     | `b'FOUND'`                              |
+| **NOTFOUND**  | `b'NOTFOUND'`                           |
+| **EOF**       | `b'EOF'`                                |
