@@ -3,13 +3,14 @@ import os
 import logging
 import threading
 
+
 def run_server(args):
     host, port = args.host, args.port
     storage, protocol = args.storage, args.protocol
     
     setup_logging(args)
     validate_storage(storage)
-    
+
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_socket:
         try:
             s_socket.bind((host, port))
@@ -17,11 +18,14 @@ def run_server(args):
             
             while True:
                 data, addr = s_socket.recvfrom(1024)
-                client_thread = threading.Thread(target=server_handle_request, args=(s_socket, data, addr, storage, protocol))
+                client_thread = threading.Thread(target=server_handle_request, 
+                                                 args=(s_socket, data, addr, storage, protocol), 
+                                                 daemon=True)
                 client_thread.start()
            
         except Exception as e:
             logging.error(f"Server error: {str(e)}")
+
 
 def server_handle_request(sock, data, addr, storage_dir, protocol):
     try:
@@ -46,6 +50,7 @@ def server_handle_request(sock, data, addr, storage_dir, protocol):
     except Exception as e:
         logging.error(f"Request handling error: {str(e)}")
 
+
 def start_upload(sock, addr, filepath):
     sock.sendto(b"READY", addr)
     
@@ -56,6 +61,7 @@ def start_upload(sock, addr, filepath):
                 break
             f.write(data)
 
+
 def start_download(sock, addr, filepath):
     if not os.path.exists(filepath):
         sock.sendto(b"NOTFOUND", addr)
@@ -63,14 +69,17 @@ def start_download(sock, addr, filepath):
         
     sock.sendto(b"FOUND", addr)
     with open(filepath, 'rb') as f:
-        while (chunk := f.read(1024)):
+        while (chunk := f.read(1024)): 
             sock.sendto(chunk, addr)
     sock.sendto(b"EOF", addr)
 
+
 def setup_logging(args):
     level = logging.INFO if not args.quiet else logging.WARNING
-    if args.verbose: level = logging.DEBUG
+    if args.verbose: 
+        level = logging.DEBUG
     logging.basicConfig(format='%(levelname)s: %(message)s', level=level)
+
 
 def validate_storage(path):
     os.makedirs(path, exist_ok=True)

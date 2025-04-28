@@ -7,6 +7,20 @@ def encode_command(file_name, command):
         return f"UPLOAD{file_name}".encode()
     elif command == "download":
         return f"DOWNLOAD{file_name}".encode()
+    
+def client_handle_download(sock, addr, filepath, protocol):
+    validate_path(filepath)
+    # if protocol == "saw":
+    #     stop_and_wait_receive(sock, addr, filepath)
+    # elif protocol == "sr":
+    #     selective_repeat_receive(sock, addr, filepath)
+
+def client_handle_upload(sock, addr, filepath, protocol):
+    validate_file(filepath)
+    # if protocol == "saw":
+    #     stop_and_wait_send(sock, addr, filepath)
+    # elif protocol == "sr":
+    #     selective_repeat_send(sock, addr, filepath)
 
 def run_client(args, command):
     setup_logging(args)
@@ -30,7 +44,7 @@ def run_client(args, command):
                 logging.error("Server not ready")
                 return
             upload_file(args, c_sock) # Esto no va, se llamaria al handle_upload, se validarian los parametros y se llamaria al protocolo que corresponda
-            # client_handle_upload(c_sock, addr, args.src, protocol)
+            # client_handle_upload(c_sock, addr, filepath, protocol)
         
         elif command == "download":
             if response == b"NOTFOUND":
@@ -48,6 +62,7 @@ def upload_file(args, sock):
         while (chunk := f.read(1024)):
             sock.sendto(chunk, (args.host, args.port))
         sock.sendto(b"EOF", (args.host, args.port))
+
 
 def download_file(args):
     setup_logging(args)
@@ -70,15 +85,16 @@ def download_file(args):
                 f.write(data)
 
 
-
 def setup_logging(args):
     level = logging.INFO if not args.quiet else logging.WARNING
     if args.verbose: level = logging.DEBUG
     logging.basicConfig(format='%(levelname)s: %(message)s', level=level)
 
+
 def validate_file(path):
     if not os.path.isfile(path):
         raise ValueError(f"Source file not found: {path}")
+
 
 def validate_path(path):
     os.makedirs(path, exist_ok=True)
