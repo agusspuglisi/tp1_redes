@@ -1,6 +1,7 @@
 import socket
 import os
 import logging
+from protocols.stop_and_wait import stop_and_wait_receive, stop_and_wait_send
 
 def encode_command(file_name, command):
     if command == "upload":
@@ -17,8 +18,8 @@ def client_handle_download(sock, addr, filepath, protocol):
 
 def client_handle_upload(sock, addr, filepath, protocol):
     validate_file(filepath)
-    # if protocol == "saw":
-    #     stop_and_wait_send(sock, addr, filepath)
+    if protocol == "saw":
+       stop_and_wait_send(sock, addr, filepath)
     # elif protocol == "sr":
     #     selective_repeat_send(sock, addr, filepath)
 
@@ -43,15 +44,15 @@ def run_client(args, command):
             if response != b"READY":
                 logging.error("Server not ready")
                 return
-            upload_file(args, c_sock) # Esto no va, se llamaria al handle_upload, se validarian los parametros y se llamaria al protocolo que corresponda
-            # client_handle_upload(c_sock, addr, filepath, protocol)
+            # upload_file(args, c_sock) # Esto no va, se llamaria al handle_upload, se validarian los parametros y se llamaria al protocolo que corresponda
+            client_handle_upload(c_sock, addr, args.src, protocol)
         
         elif command == "download":
             if response == b"NOTFOUND":
                 logging.error("File not found on server")
                 return
-            # filepath = os.path.join(args.dst, args.name)
-            # client_handle_download(c_sock, addr, filepath, protocol)
+            filepath = os.path.join(args.dst, args.name)
+            client_handle_download(c_sock, addr, filepath, protocol)
 
 
 

@@ -2,6 +2,7 @@ import socket
 import os
 import logging
 import threading
+from protocols.stop_and_wait import stop_and_wait_receive, stop_and_wait_send
 
 
 def run_server(args):
@@ -32,20 +33,20 @@ def server_handle_request(sock, data, addr, storage_dir, protocol):
         if data.startswith(b"UPLOAD"):
             filename = data[6:].decode()
             filepath = os.path.join(storage_dir, filename)
-            # if protocol == 'saw':
-            #     stop_and_wait_receive(sock, addr, filepath)
+            sock.sendto(b"READY", addr)
+            if protocol == 'saw':
+                stop_and_wait_receive(sock, addr, filepath)
             # else if protocol == "sr":
             #     selective_repeat_receive(sock, addr, filepath)
-            start_upload(sock, addr, filepath) # Esto no iria
             
         elif data.startswith(b"DOWNLOAD"):
             filename = data[8:].decode()
             filepath = os.path.join(storage_dir, filename)
-            # if protocol == 'saw':
-            #     stop_and_wait_send(sock, addr, filepath)
+            sock.sendto(b"FOUND", addr)
+            if protocol == 'saw':
+                stop_and_wait_send(sock, addr, filepath)
             # else if protocol == "sr":
             #     selective_repeat_send(sock, addr, filepath)
-            start_download(sock, addr, filepath) # Esto tampoco
             
     except Exception as e:
         logging.error(f"Request handling error: {str(e)}")
