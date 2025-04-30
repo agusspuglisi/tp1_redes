@@ -3,6 +3,7 @@ import os
 import logging
 import threading
 from protocols.stop_and_wait import stop_and_wait_receive, stop_and_wait_send
+from protocols.selective_repeat import selective_repeat_receive, selective_repeat_send
 
 
 def run_server(args):
@@ -36,44 +37,24 @@ def server_handle_request(sock, data, addr, storage_dir, protocol):
             sock.sendto(b"READY", addr)
             if protocol == 'saw':
                 stop_and_wait_receive(sock, addr, filepath)
-            # else if protocol == "sr":
-            #     selective_repeat_receive(sock, addr, filepath)
+            elif protocol == "sr":
+               selective_repeat_receive(sock, addr, filepath)
             
         elif data.startswith(b"DOWNLOAD"):
             filename = data[8:].decode()
             filepath = os.path.join(storage_dir, filename)
+            if not os.path.exists(filepath):
+                sock.sendto(b"NOTFOUND", addr)
+                return
+
             sock.sendto(b"FOUND", addr)
             if protocol == 'saw':
                 stop_and_wait_send(sock, addr, filepath)
-            # else if protocol == "sr":
-            #     selective_repeat_send(sock, addr, filepath)
+            elif protocol == "sr":
+                selective_repeat_send(sock, addr, filepath)
             
     except Exception as e:
         logging.error(f"Request handling error: {str(e)}")
-
-
-def start_upload(sock, addr, filepath):
-    sock.sendto(b"READY", addr)
-    
-    with open(filepath, 'wb') as f:
-        while True:
-            data, _ = sock.recvfrom(1024)
-            if data == b"EOF":
-                break
-            f.write(data)
-
-
-def start_download(sock, addr, filepath):
-    if not os.path.exists(filepath):
-        sock.sendto(b"NOTFOUND", addr)
-        return
-        
-    sock.sendto(b"FOUND", addr)
-    with open(filepath, 'rb') as f:
-        while (chunk := f.read(1024)): 
-            sock.sendto(chunk, addr)
-    sock.sendto(b"EOF", addr)
-
 
 def setup_logging(args):
     level = logging.INFO if not args.quiet else logging.WARNING

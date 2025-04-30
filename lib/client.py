@@ -2,6 +2,7 @@ import socket
 import os
 import logging
 from protocols.stop_and_wait import stop_and_wait_receive, stop_and_wait_send
+from protocols.selective_repeat import selective_repeat_receive, selective_repeat_send
 
 def encode_command(file_name, command):
     if command == "upload":
@@ -10,18 +11,18 @@ def encode_command(file_name, command):
         return f"DOWNLOAD{file_name}".encode()
     
 def client_handle_download(sock, addr, filepath, protocol):
-    validate_path(filepath)
-    # if protocol == "saw":
-    #     stop_and_wait_receive(sock, addr, filepath)
-    # elif protocol == "sr":
-    #     selective_repeat_receive(sock, addr, filepath)
+    validate_path(os.path.dirname(filepath))
+    if protocol == "saw":
+       stop_and_wait_receive(sock, addr, filepath)
+    elif protocol == "sr":
+        selective_repeat_receive(sock, addr, filepath)
 
 def client_handle_upload(sock, addr, filepath, protocol):
     validate_file(filepath)
     if protocol == "saw":
        stop_and_wait_send(sock, addr, filepath)
-    # elif protocol == "sr":
-    #     selective_repeat_send(sock, addr, filepath)
+    elif protocol == "sr":
+        selective_repeat_send(sock, addr, filepath)
 
 def run_client(args, command):
     setup_logging(args)
@@ -44,46 +45,17 @@ def run_client(args, command):
             if response != b"READY":
                 logging.error("Server not ready")
                 return
-            # upload_file(args, c_sock) # Esto no va, se llamaria al handle_upload, se validarian los parametros y se llamaria al protocolo que corresponda
             client_handle_upload(c_sock, addr, args.src, protocol)
         
         elif command == "download":
             if response == b"NOTFOUND":
                 logging.error("File not found on server")
                 return
-            filepath = os.path.join(args.dst, args.name)
-            client_handle_download(c_sock, addr, filepath, protocol)
-
-
-
-def upload_file(args, sock):
-    validate_file(args.src)
-
-    with open(args.src, 'rb') as f:
-        while (chunk := f.read(1024)):
-            sock.sendto(chunk, (args.host, args.port))
-        sock.sendto(b"EOF", (args.host, args.port))
-
-
-def download_file(args):
-    setup_logging(args)
-    validate_path(args.dst)
-    
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.sendto(f"DOWNLOAD{args.name}".encode(), (args.host, args.port))
-        response = sock.recv(1024)
-        
-        if response == b"NOTFOUND":
-            logging.error("File not found on server")
-            return
-            
-        filepath = os.path.join(args.dst, args.name)
-        with open(filepath, 'wb') as f:
-            while True:
-                data = sock.recv(1024)
-                if data == b"EOF":
-                    break
-                f.write(data)
+            elif response == b"FOUND":
+                filepath = os.path.join(args.dst, args.name)
+                client_handle_download(c_sock, addr, filepath, protocol)
+            else:
+                logging.error(f"Unexpected response: {response}")
 
 
 def setup_logging(args):
