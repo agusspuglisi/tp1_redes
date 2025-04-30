@@ -42,18 +42,22 @@ def run_client(args, command):
             return
 
         if command == "upload":
-            if response != b"READY":
+            if not response.startswith(b"READY"):
                 logging.error("Server not ready")
                 return
-            client_handle_upload(c_sock, addr, args.src, protocol)
+            _, tmp_port = response.decode().split(":")
+            tmp_addr = (args.host, int(tmp_port))
+            client_handle_upload(c_sock, tmp_addr, args.src, protocol)
         
         elif command == "download":
             if response == b"NOTFOUND":
                 logging.error("File not found on server")
                 return
-            elif response == b"FOUND":
+            elif response.startswith(b"FOUND"):
+                _, tmp_port = response.decode().split(":")
+                tmp_addr = (args.host, int(tmp_port))
                 filepath = os.path.join(args.dst, args.name)
-                client_handle_download(c_sock, addr, filepath, protocol)
+                client_handle_download(c_sock, tmp_addr, filepath, protocol)
             else:
                 logging.error(f"Unexpected response: {response}")
 

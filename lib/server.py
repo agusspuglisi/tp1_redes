@@ -34,11 +34,14 @@ def server_handle_request(sock, data, addr, storage_dir, protocol):
         if data.startswith(b"UPLOAD"):
             filename = data[6:].decode()
             filepath = os.path.join(storage_dir, filename)
-            sock.sendto(b"READY", addr)
-            if protocol == 'saw':
-                stop_and_wait_receive(sock, addr, filepath)
-            elif protocol == "sr":
-               selective_repeat_receive(sock, addr, filepath)
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tmp_sock:
+                tmp_sock.bind(('', 0)) 
+                tmp_port = tmp_sock.getsockname()[1]
+                sock.sendto(f"READY:{tmp_port}".encode(), addr)
+                if protocol == 'saw':
+                    stop_and_wait_receive(tmp_sock, addr, filepath)
+                elif protocol == "sr":
+                    selective_repeat_receive(tmp_sock, addr, filepath)
             
         elif data.startswith(b"DOWNLOAD"):
             filename = data[8:].decode()
@@ -46,12 +49,15 @@ def server_handle_request(sock, data, addr, storage_dir, protocol):
             if not os.path.exists(filepath):
                 sock.sendto(b"NOTFOUND", addr)
                 return
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tmp_sock:
+                tmp_sock.bind(('', 0))
+                tmp_port = tmp_sock.getsockname()[1]
+                sock.sendto(f"FOUND:{tmp_port}".encode(), addr)
 
-            sock.sendto(b"FOUND", addr)
-            if protocol == 'saw':
-                stop_and_wait_send(sock, addr, filepath)
-            elif protocol == "sr":
-                selective_repeat_send(sock, addr, filepath)
+                if protocol == 'saw':
+                    stop_and_wait_send(tmp_sock, addr, filepath)
+                elif protocol == "sr":
+                    selective_repeat_send(sock, addr, filepath)
             
     except Exception as e:
         logging.error(f"Request handling error: {str(e)}")
