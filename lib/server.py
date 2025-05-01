@@ -42,7 +42,7 @@ def server_handle_request(sock, data, addr, storage_dir, protocol):
                     stop_and_wait_receive(tmp_sock, addr, filepath)
                 elif protocol == "sr":
                     selective_repeat_receive(tmp_sock, addr, filepath)
-            
+
         elif data.startswith(b"DOWNLOAD"):
             filename = data[8:].decode()
             filepath = os.path.join(storage_dir, filename)
