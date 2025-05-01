@@ -46,7 +46,6 @@ def stop_and_wait_receive(sock, addr, filepath):
                 f.write(packet.data)
                 ack = Package(expected_seq, True, b'')
                 sock.sendto(ack.to_bytes(), addr)
-                print(f"ACK sent for packet {expected_seq}")
                 expected_seq = 1 - expected_seq
             else:
                 expected_seq_alt = 1 - expected_seq
