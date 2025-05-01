@@ -24,13 +24,11 @@ def stop_and_wait_send(sock, addr, filepath):
                     raw_ack, _ = sock.recvfrom(2)
                     ack_packet = Package.from_bytes(raw_ack)
                     if ack_packet.ack and ack_packet.seq_num == seq_num:
-                        print(f"ACK received for packet {seq_num}")
                         seq_num = 1 - seq_num
                         break
                 except socket.timeout:
                     continue
             if not data:
-                print("File transfer complete.")
                 break
 
 
@@ -44,7 +42,6 @@ def stop_and_wait_receive(sock, addr, filepath):
                 if not packet.data:
                     ack = Package(expected_seq, True, b'')
                     sock.sendto(ack.to_bytes(), addr)
-                    print(f"ACK sent for empty packet, indicating EOF {expected_seq}")
                     break
                 f.write(packet.data)
                 ack = Package(expected_seq, True, b'')
