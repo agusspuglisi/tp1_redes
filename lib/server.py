@@ -57,7 +57,7 @@ def server_handle_request(sock, data, addr, storage_dir, protocol):
                 if protocol == 'saw':
                     stop_and_wait_send(tmp_sock, addr, filepath)
                 elif protocol == "sr":
-                    selective_repeat_send(sock, addr, filepath)
+                    selective_repeat_send(tmp_sock, addr, filepath)
             
     except Exception as e:
         logging.error(f"Request handling error: {str(e)}")
