@@ -17,11 +17,11 @@ def stop_and_wait_send(sock, addr, filepath):
     with open(filepath, 'rb') as f:
         while True:
             data = f.read(256)
-            packet = Package(seq_num, False, data)
+            packet = Package(seq_num, False, data if data else b'EOF')
             while True:
                 sock.sendto(packet.to_bytes(), addr)
                 try:
-                    raw_ack, _ = sock.recvfrom(2)
+                    raw_ack, _ = sock.recvfrom(1024)
                     ack_packet = Package.from_bytes(raw_ack)
                     if ack_packet.ack and ack_packet.seq_num == seq_num:
                         seq_num = 1 - seq_num
@@ -36,18 +36,18 @@ def stop_and_wait_receive(sock, addr, filepath):
     expected_seq = 0
     with open(filepath, 'wb') as f:
         while True:
-            raw_data, sender = sock.recvfrom(258)
+            raw_data, sender = sock.recvfrom(1024)
             packet = Package.from_bytes(raw_data)
             if packet.seq_num == expected_seq:
-                if not packet.data:
+                if packet.data == b'EOF':
                     ack = Package(expected_seq, True, b'')
-                    sock.sendto(ack.to_bytes(), addr)
+                    sock.sendto(ack.to_bytes(), sender)
                     break
                 f.write(packet.data)
                 ack = Package(expected_seq, True, b'')
-                sock.sendto(ack.to_bytes(), addr)
+                sock.sendto(ack.to_bytes(), sender)
                 expected_seq = 1 - expected_seq
             else:
                 expected_seq_alt = 1 - expected_seq
-                ack = Package(expected_seq_alt , True, b'')
-                sock.sendto(ack.to_bytes(), addr)
+                ack = Package(expected_seq_alt, True, b'')
+                sock.sendto(ack.to_bytes(), sender)

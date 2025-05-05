@@ -38,6 +38,9 @@ def server_handle_request(sock, data, addr, storage_dir, protocol):
                 tmp_sock.bind(('', 0)) 
                 tmp_port = tmp_sock.getsockname()[1]
                 sock.sendto(f"READY:{tmp_port}".encode(), addr)
+                
+                logging.info(f"Starting upload for {filename} on port {tmp_port}")
+
                 if protocol == 'saw':
                     stop_and_wait_receive(tmp_sock, addr, filepath)
                 elif protocol == "sr":
@@ -53,14 +56,22 @@ def server_handle_request(sock, data, addr, storage_dir, protocol):
                 tmp_sock.bind(('', 0))
                 tmp_port = tmp_sock.getsockname()[1]
                 sock.sendto(f"FOUND:{tmp_port}".encode(), addr)
-
+                
+                # Get file size for logging
+                file_size = os.path.getsize(filepath) / (1024 * 1024)
+                logging.info(f"Starting download for {filename} ({file_size:.2f} MB) on port {tmp_port}")
+                                
                 if protocol == 'saw':
                     stop_and_wait_send(tmp_sock, addr, filepath)
                 elif protocol == "sr":
-                    selective_repeat_send(sock, addr, filepath)
+                    selective_repeat_send(tmp_sock, addr, filepath)  # CRITICAL BUG FIX: Using tmp_sock
+                
+                logging.info(f"Download completed for {filename}")
             
     except Exception as e:
         logging.error(f"Request handling error: {str(e)}")
+        import traceback
+        logging.error(traceback.format_exc())
 
 def setup_logging(args):
     level = logging.INFO if not args.quiet else logging.WARNING
