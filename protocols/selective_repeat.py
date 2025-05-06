@@ -7,12 +7,13 @@ CHUNK_SIZE = 256
 TIMEOUT = 5.0  # segundos
 HEADER_SIZE = 2
 SEQ_MODULO = 2 * WINDOW_SIZE
+TIMEOUT = 2
 
 # Al usar SEQ_MODULO = 2 * WINDOW_SIZE, Selective Repeat asegura que no habrá ambigüedad 
 # ni solapamiento en los números de secuencia entre paquetes nuevos y viejos.
 
 def selective_repeat_send(sock, addr, filepath):
-    sock.settimeout(0.1)
+    sock.settimeout(TIMEOUT)
     seq_base = 0
     next_seq = 0
     buffer = {}  # Contiene los paquetes enviados pero pendientes de confirmacion
@@ -26,7 +27,8 @@ def selective_repeat_send(sock, addr, filepath):
             # solo envia si nuevos paquetes si hay lugar en la ventana / envia hasta llenar ventana
             while len(buffer) < WINDOW_SIZE and not eof_sent:
                 data = f.read(CHUNK_SIZE)
-                if not data: 
+                if not data:
+                    print("Not data") 
                     eof_sent = True
                     eof_seq = next_seq
                     packet = Package(next_seq, False, b'')
@@ -61,7 +63,6 @@ def selective_repeat_send(sock, addr, filepath):
                 seq_base = (seq_base + 1) % SEQ_MODULO
 
         # mandar un eof
-        # eof_packet = Package(next_seq, False, b'')
         while True:
             try:
                 raw_ack, _ = sock.recvfrom(HEADER_SIZE)
@@ -69,7 +70,7 @@ def selective_repeat_send(sock, addr, filepath):
                 if ack_packet.ack and ack_packet.seq_num == eof_seq:
                     break
             except socket.timeout:
-                sock.sendto(Package(eof_seq, False, b'').to_bytes(), addr) # Ver
+                sock.sendto(Package(eof_seq, True, b'').to_bytes(), addr) # Ver
 
 def selective_repeat_receive(sock, addr, filepath):
     print("[SR RECV] Recibiendo archivo usando Selective Repeat...")
@@ -83,7 +84,7 @@ def selective_repeat_receive(sock, addr, filepath):
             try:
                 raw_data, sender = sock.recvfrom(CHUNK_SIZE + HEADER_SIZE)
                 packet = Package.from_bytes(raw_data)
-
+                
                 seq = packet.seq_num
 
                 # envia ack siempre
@@ -94,14 +95,14 @@ def selective_repeat_receive(sock, addr, filepath):
                     eof_received = True
                     eof_seq = seq
                     if seq == expected_base:
-                        break  # Ya se recibio todolo anterior en orden
+                        sock.sendto(Package(eof_seq, True, b'').to_bytes(), addr) # Ver
+                        break  # Ya se recibio todo lo anterior en orden
                     else:
                         continue
 
-                # Guardo cualquierpaquete valido en recived
+                # Guardo cualquier paquete valido en received
                 if (seq - expected_base + SEQ_MODULO) % SEQ_MODULO < WINDOW_SIZE:
                     received[seq] = packet.data
-
 
                 # escribe en orden
                 while expected_base in received:
