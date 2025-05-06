@@ -4,6 +4,8 @@ import logging
 from protocols.stop_and_wait import stop_and_wait_receive, stop_and_wait_send
 from protocols.selective_repeat import selective_repeat_receive, selective_repeat_send
 
+TIMEOUT = 0.5 
+
 def encode_command(file_name, command):
     if command == "upload":
         return f"UPLOAD{file_name}".encode()
@@ -30,7 +32,7 @@ def run_client(args, command):
     protocol = args.protocol
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as c_sock:
-        c_sock.settimeout(2.0) # Setear constante para timeout
+        c_sock.settimeout(TIMEOUT) # Setear constante para timeout
 
         encoded_command = encode_command(args.name, command)
         c_sock.sendto(encoded_command, addr)

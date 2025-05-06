@@ -11,8 +11,10 @@
 import socket
 from protocols.package import Package
 
+TIMEOUT = 0.5
+
 def stop_and_wait_send(sock, addr, filepath):
-    sock.settimeout(1.0)
+    sock.settimeout(TIMEOUT)
     seq_num = 0
     with open(filepath, 'rb') as f:
         while True:

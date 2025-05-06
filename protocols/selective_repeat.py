@@ -1,13 +1,14 @@
 import socket
+import logging
 import time
 from protocols.package import Package
 
-WINDOW_SIZE = 4
-CHUNK_SIZE = 256
-TIMEOUT = 5.0  # segundos
+
+WINDOW_SIZE = 8
+CHUNK_SIZE = 4096
+TIMEOUT = 0.5  # segundos
 HEADER_SIZE = 2
 SEQ_MODULO = 2 * WINDOW_SIZE
-TIMEOUT = 2
 
 # Al usar SEQ_MODULO = 2 * WINDOW_SIZE, Selective Repeat asegura que no habrá ambigüedad 
 # ni solapamiento en los números de secuencia entre paquetes nuevos y viejos.
@@ -31,7 +32,7 @@ def selective_repeat_send(sock, addr, filepath):
                     print("Not data") 
                     eof_sent = True
                     eof_seq = next_seq
-                    packet = Package(next_seq, False, b'')
+                    packet = Package(next_seq, True, b'')
                 else:
                     packet = Package(next_seq, False, data)
                     
@@ -41,29 +42,34 @@ def selective_repeat_send(sock, addr, filepath):
                 next_seq=(next_seq+1) % SEQ_MODULO
 
             # escuchar ack´s
-            try:
-                raw_ack, _ = sock.recvfrom(HEADER_SIZE)
-                ack_packet = Package.from_bytes(raw_ack)
-                if ack_packet.ack and ack_packet.seq_num in buffer:
-                    acks_received.add(ack_packet.seq_num)
-            except socket.timeout:
-                pass
+            if not eof_sent:
+                try:
+                    raw_ack, _ = sock.recvfrom(HEADER_SIZE)
+                    ack_packet = Package.from_bytes(raw_ack)
+                    if ack_packet.ack and ack_packet.seq_num in buffer:
+                        acks_received.add(ack_packet.seq_num)
+                except socket.timeout:
+                    logging.error("ACK timed out")
+                    pass
 
-            # retrasmision por timeout
-            for seq in list(buffer):
-                if seq not in acks_received and (time.time() - timers[seq] > TIMEOUT):
-                    sock.sendto(buffer[seq].to_bytes(), addr)
-                    timers[seq] = time.time() # si se retrasmite, reinicia el timer
+                # retrasmision por timeout
+                for seq in list(buffer):
+                    if seq not in acks_received and (time.time() - timers[seq] > TIMEOUT):
+                        sock.sendto(buffer[seq].to_bytes(), addr)
+                        timers[seq] = time.time() # si se retrasmite, reinicia el timer
 
-            # desliza la ventana
-            while seq_base in acks_received: # and acks_received[seq_base]:
-                del buffer[seq_base]
-                del timers[seq_base]
-                acks_received.remove(seq_base)
-                seq_base = (seq_base + 1) % SEQ_MODULO
+                # desliza la ventana
+                while seq_base in acks_received: # and acks_received[seq_base]:
+                    del buffer[seq_base]
+                    del timers[seq_base]
+                    acks_received.remove(seq_base)
+                    seq_base = (seq_base + 1) % SEQ_MODULO
+            else:
+                break
 
         # mandar un eof
-        while True:
+        eof_ack_recv_tries = 0
+        while eof_ack_recv_tries < 3:
             try:
                 raw_ack, _ = sock.recvfrom(HEADER_SIZE)
                 ack_packet = Package.from_bytes(raw_ack)
@@ -71,6 +77,8 @@ def selective_repeat_send(sock, addr, filepath):
                     break
             except socket.timeout:
                 sock.sendto(Package(eof_seq, True, b'').to_bytes(), addr) # Ver
+                eof_ack_recv_tries+=1
+        logging.info("TRANSFER FINISHED")
 
 def selective_repeat_receive(sock, addr, filepath):
     print("[SR RECV] Recibiendo archivo usando Selective Repeat...")
