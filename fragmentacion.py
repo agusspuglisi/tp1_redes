@@ -4,7 +4,7 @@ from mininet.log import setLogLevel
 from mininet.net import Mininet
 from mininet.node import Node
 from mininet.topo import Topo
-#from mininet.link import TCLink
+from mininet.link import TCLink
 
 
 
@@ -29,9 +29,12 @@ class FragmentationTopo(Topo):
         self.addLink(s2, r1, intfName2="r1-eth2",
                      params2={"ip": "10.0.0.5/30"})
 
+
         h1 = self.addHost("h1", ip="10.0.0.2/30", defaultRoute="via 10.0.0.1")
         h2 = self.addHost("h2", ip="10.0.0.6/30", defaultRoute="via 10.0.0.5")
-        #self.addLink(h2, s2, loss = 10) 
+
+        self.addLink(h2, s2, loss = 10) 
+
 
         for h, s in [(h1, s1), (h2, s2)]:
             self.addLink(h, s)
