@@ -36,11 +36,15 @@ def three_way_handshake(socket, addr, data):
             received, _ = socket.recvfrom(3)
             if received.startswith(b"ACK"):
                 return True
-            return False
+            else:
+                logging.error("Invalid ACK message")
+                return False
         except Exception as e:
             logging.error(e)
     else:
-        logging.error("Invalid request")
+        logging.error("Invalid HI message")
+        return False
+
 
 def server_handle_request(sock, data, addr, storage_dir, protocol):
     transfer_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

@@ -29,13 +29,13 @@ def client_handle_upload(sock, addr, filepath, protocol):
 def three_way_handshake(socket, addr):
     socket.sendto(b"HI", addr)
     try:
-        print("espero HI ACK")
         received, transfer_address = socket.recvfrom(6)
-        print("recibi HI ACK")
         if received.startswith(b"HI_ACK"):
-            print("envio ACK y me voy")
             socket.sendto(b"ACK", transfer_address)
             return True, transfer_address
+        else:
+            logging.error("Invalid HI ACK message")
+            return False, (0,0)
     except Exception as e:
         logging.error(e)
     return False, (0,0)
