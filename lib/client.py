@@ -37,7 +37,7 @@ def three_way_handshake(socket, addr):
             logging.error("Invalid HI ACK message")
             return False, (0,0)
     except Exception as e:
-        logging.error(e)
+        logging.error(f"Handshake error: {str(e)}")
     return False, (0,0)
 
 def run_client(args, command):
@@ -46,35 +46,37 @@ def run_client(args, command):
     protocol = args.protocol
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as c_sock:
-        c_sock.settimeout(2.0) # Setear constante para timeout
+        c_sock.settimeout(2.0)
 
         handshake_ok, transfer_address = three_way_handshake(c_sock, addr)
         if handshake_ok:
+            logging.info("Handshake successful | Proceeding with transfer")
             encoded_command = encode_command(args.name, command)
-            c_sock.sendto(encoded_command, transfer_address)
+            c_sock.sendto(encoded_command, transfer_address)        
             try:
-                response, _ = c_sock.recvfrom(1024) # Setear cuantos bytes voy a recibir
+                response, _ = c_sock.recvfrom(1024)
+                
+                if command == "upload":
+                    logging.info(f"Uploading file: {args.src} -> {args.name}")
+                    if not response.startswith(b"READY"):
+                        logging.error("Server not ready")
+                        return
+                    client_handle_upload(c_sock, transfer_address, args.src, protocol)
+                    logging.info("Upload completed successfully")
+                
+                elif command == "download":
+                    logging.info(f"Downloading file: {args.name} -> {args.dst}")
+                    if response == b"NOTFOUND":
+                        logging.error("File not found on server")
+                        return
+                    elif response.startswith(b"FOUND"):
+                        filepath = os.path.join(args.dst, args.name)
+                        client_handle_download(c_sock, transfer_address, filepath, protocol)
+                        logging.info("Download completed successfully")
             except socket.timeout:
                 logging.error("Timeout in server response")
-                return
-
-            if command == "upload":
-                if not response.startswith(b"READY"):
-                    logging.error("Server not ready")
-                    return
-                client_handle_upload(c_sock, transfer_address, args.src, protocol)
-            
-            elif command == "download":
-                if response == b"NOTFOUND":
-                    logging.error("File not found on server")
-                    return
-                elif response.startswith(b"FOUND"):
-                    filepath = os.path.join(args.dst, args.name)
-                    client_handle_download(c_sock, transfer_address, filepath, protocol)
-                else:
-                    logging.error(f"Unexpected response: {response}")
-            else:
-                logging.error("Handshake with server failed")
+        else:
+            logging.error("Handshake with server failed")
 
 
 
