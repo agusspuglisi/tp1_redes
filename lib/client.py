@@ -26,42 +26,56 @@ def client_handle_upload(sock, addr, filepath, protocol):
     elif protocol == "sr":
         selective_repeat_send(sock, addr, filepath)
 
+def three_way_handshake(socket, addr):
+    socket.sendto(b"HI", addr)
+    try:
+        print("espero HI ACK")
+        received, transfer_address = socket.recvfrom(6)
+        print("recibi HI ACK")
+        if received.startswith(b"HI_ACK"):
+            print("envio ACK y me voy")
+            socket.sendto(b"ACK", transfer_address)
+            return True, transfer_address
+    except Exception as e:
+        logging.error(e)
+    return False, (0,0)
+
 def run_client(args, command):
     setup_logging(args)
     addr = (args.host, args.port)
     protocol = args.protocol
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as c_sock:
-        c_sock.settimeout(TIMEOUT) # Setear constante para timeout
+        c_sock.settimeout(2.0) # Setear constante para timeout
 
-        encoded_command = encode_command(args.name, command)
-        c_sock.sendto(encoded_command, addr)
-
-        try:
-            response, _ = c_sock.recvfrom(1024) # Setear cuantos bytes voy a recibir
-        except socket.timeout:
-            logging.error("Timeout in server response")
-            return
-
-        if command == "upload":
-            if not response.startswith(b"READY"):
-                logging.error("Server not ready")
+        handshake_ok, transfer_address = three_way_handshake(c_sock, addr)
+        if handshake_ok:
+            encoded_command = encode_command(args.name, command)
+            c_sock.sendto(encoded_command, transfer_address)
+            try:
+                response, _ = c_sock.recvfrom(1024) # Setear cuantos bytes voy a recibir
+            except socket.timeout:
+                logging.error("Timeout in server response")
                 return
-            _, tmp_port = response.decode().split(":")
-            tmp_addr = (args.host, int(tmp_port))
-            client_handle_upload(c_sock, tmp_addr, args.src, protocol)
-        
-        elif command == "download":
-            if response == b"NOTFOUND":
-                logging.error("File not found on server")
-                return
-            elif response.startswith(b"FOUND"):
-                _, tmp_port = response.decode().split(":")
-                tmp_addr = (args.host, int(tmp_port))
-                filepath = os.path.join(args.dst, args.name)
-                client_handle_download(c_sock, tmp_addr, filepath, protocol)
+
+            if command == "upload":
+                if not response.startswith(b"READY"):
+                    logging.error("Server not ready")
+                    return
+                client_handle_upload(c_sock, transfer_address, args.src, protocol)
+            
+            elif command == "download":
+                if response == b"NOTFOUND":
+                    logging.error("File not found on server")
+                    return
+                elif response.startswith(b"FOUND"):
+                    filepath = os.path.join(args.dst, args.name)
+                    client_handle_download(c_sock, transfer_address, filepath, protocol)
+                else:
+                    logging.error(f"Unexpected response: {response}")
             else:
-                logging.error(f"Unexpected response: {response}")
+                logging.error("Handshake with server failed")
+
 
 
 def setup_logging(args):

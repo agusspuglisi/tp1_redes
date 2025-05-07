@@ -5,6 +5,7 @@ import threading
 from protocols.stop_and_wait import stop_and_wait_receive, stop_and_wait_send
 from protocols.selective_repeat import selective_repeat_receive, selective_repeat_send
 
+TIMEOUT = 0.5
 
 def run_server(args):
     host, port = args.host, args.port
@@ -28,39 +29,50 @@ def run_server(args):
         except Exception as e:
             logging.error(f"Server error: {str(e)}")
 
+def three_way_handshake(socket, addr, data):
+    if data.startswith(b"HI"):
+        socket.sendto(b"HI_ACK", addr)
+        try:
+            received, _ = socket.recvfrom(3)
+            if received.startswith(b"ACK"):
+                return True
+            return False
+        except Exception as e:
+            logging.error(e)
+    else:
+        logging.error("Invalid request")
 
 def server_handle_request(sock, data, addr, storage_dir, protocol):
-    try:
-        if data.startswith(b"UPLOAD"):
-            filename = data[6:].decode()
-            filepath = os.path.join(storage_dir, filename)
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tmp_sock:
-                tmp_sock.bind(('', 0)) 
-                tmp_port = tmp_sock.getsockname()[1]
-                sock.sendto(f"READY:{tmp_port}".encode(), addr)
+    transfer_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    transfer_sock.settimeout(2.0)
+    transfer_sock.bind(('', 0))
+    transfer_port = transfer_sock.getsockname()[1]
+    if three_way_handshake(transfer_sock, addr, data):
+        msg, _ = transfer_sock.recvfrom(1024)
+        try:
+            if msg.startswith(b"UPLOAD"):
+                filename = msg[6:].decode()
+                filepath = os.path.join(storage_dir, filename)
+                sock.sendto(f"READY:{transfer_port}".encode(), addr)
                 if protocol == 'saw':
-                    stop_and_wait_receive(tmp_sock, addr, filepath)
+                    stop_and_wait_receive(transfer_sock, addr, filepath)
                 elif protocol == "sr":
-                    selective_repeat_receive(tmp_sock, addr, filepath)
-
-        elif data.startswith(b"DOWNLOAD"):
-            filename = data[8:].decode()
-            filepath = os.path.join(storage_dir, filename)
-            if not os.path.exists(filepath):
-                sock.sendto(b"NOTFOUND", addr)
-                return
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tmp_sock:
-                tmp_sock.bind(('', 0))
-                tmp_port = tmp_sock.getsockname()[1]
-                sock.sendto(f"FOUND:{tmp_port}".encode(), addr)
-
+                    selective_repeat_receive(transfer_sock, addr, filepath)
+            elif msg.startswith(b"DOWNLOAD"):
+                filename = msg[8:].decode()
+                filepath = os.path.join(storage_dir, filename)
+                if not os.path.exists(filepath):
+                    sock.sendto(b"NOTFOUND", addr)
+                    return
+                sock.sendto(f"FOUND:{transfer_port}".encode(), addr)
                 if protocol == 'saw':
-                    stop_and_wait_send(tmp_sock, addr, filepath)
+                    stop_and_wait_send(transfer_sock, addr, filepath)
                 elif protocol == "sr":
-                    selective_repeat_send(tmp_sock, addr, filepath)
-            
-    except Exception as e:
-        logging.error(f"Request handling error: {str(e)}")
+                    selective_repeat_send(transfer_sock, addr, filepath)
+        except Exception as e:
+            logging.error(f"Request handling error: {str(e)}")
+    else:
+        logging.error("Handshake with client failed")
 
 def setup_logging(args):
     level = logging.INFO if not args.quiet else logging.WARNING
