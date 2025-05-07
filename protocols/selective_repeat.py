@@ -108,6 +108,8 @@ def selective_repeat_send(sock, addr, filepath):
     
 def selective_repeat_receive(sock, addr, filepath):
     
+    sock.settimeout(None)
+
     expected_base = 0
     received = {}
     eof_received = False

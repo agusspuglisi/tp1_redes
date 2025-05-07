@@ -14,3 +14,8 @@ python3 upload.py --host 127.0.0.1 --port 8080 --src archivo_grande.txt --name a
 python3 download.py --host 127.0.0.1 --port 8080 --name testfile.txt --dst downloads -r saw
 # Descargar archivo testfile en la carpeta 'downloads' con protocolo selective repeat:
 python3 download.py --host 127.0.0.1 --port 8080 --name archivo_grande.txt --dst downloads -r sr
+
+# Simulacion de perdida de paquetes del 10% con comcast
+go run comcast.go --device=lo --packet-loss=10%
+# Frenar simulacion perdida de paquetes
+go run comcast.go --device=lo --stop

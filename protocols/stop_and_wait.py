@@ -13,7 +13,8 @@ from protocols.package import Package
 import logging 
 import time
 
-TIMEOUT = 0.5
+TIMEOUT = 0.25
+CHUCK_SIZE = 4096
 
 def stop_and_wait_send(sock, addr, filepath):
     sock.settimeout(TIMEOUT)
@@ -26,13 +27,12 @@ def stop_and_wait_send(sock, addr, filepath):
     
     with open(filepath, 'rb') as f:
         while True:
-            data = f.read(256)
+            data = f.read(CHUCK_SIZE)
             packet = Package(seq_num, False, data)
             
             if data:
                 total_bytes += len(data)
-                if seq_num == 0:  
-                    logging.debug(f"Sending packet seq={seq_num}, size={len(data)} bytes")
+                logging.debug(f"Sending packet seq={seq_num}, size={len(data)} bytes")
             else:
                 logging.info("Sending EOF packet")
                 
@@ -67,6 +67,7 @@ def stop_and_wait_send(sock, addr, filepath):
 
 
 def stop_and_wait_receive(sock, addr, filepath):
+    sock.settimeout(None)
     expected_seq = 0
     total_bytes = 0
     duplicate_packets = 0
@@ -76,31 +77,33 @@ def stop_and_wait_receive(sock, addr, filepath):
     
     with open(filepath, 'wb') as f:
         while True:
-            raw_data, sender = sock.recvfrom(258)
-            packet = Package.from_bytes(raw_data)
-            
-            if packet.seq_num == expected_seq:
-                if not packet.data:
-                    logging.info("EOF packet received")
+            #try:
+                raw_data, sender = sock.recvfrom(CHUCK_SIZE+2)
+                packet = Package.from_bytes(raw_data)
+                data_len = len(packet.data) if packet.data else 0
+                logging.debug(f"Received packet seq={expected_seq}, size={data_len} bytes")
+                
+                if packet.seq_num == expected_seq:
+                    if not packet.data:
+                        logging.info("EOF packet received")
+                        ack = Package(expected_seq, True, b'')
+                        sock.sendto(ack.to_bytes(), addr)
+                        break
+                        
+                    total_bytes += data_len
+                    
+                    f.write(packet.data)
                     ack = Package(expected_seq, True, b'')
                     sock.sendto(ack.to_bytes(), addr)
-                    break
-                    
-                data_len = len(packet.data)
-                total_bytes += data_len
-                if expected_seq == 0:  
-                    logging.debug(f"Received packet seq={expected_seq}, size={data_len} bytes")
-                
-                f.write(packet.data)
-                ack = Package(expected_seq, True, b'')
-                sock.sendto(ack.to_bytes(), addr)
-                expected_seq = 1 - expected_seq
-            else:
-                duplicate_packets += 1
-                logging.debug(f"Received duplicate packet seq={packet.seq_num}, expecting {expected_seq}")
-                expected_seq_alt = 1 - expected_seq
-                ack = Package(expected_seq_alt, True, b'')
-                sock.sendto(ack.to_bytes(), addr)
+                    expected_seq = 1 - expected_seq
+                else:
+                    duplicate_packets += 1
+                    logging.debug(f"Received duplicate packet seq={packet.seq_num}, expecting {expected_seq}")
+                    expected_seq_alt = 1 - expected_seq
+                    ack = Package(expected_seq_alt, True, b'')
+                    sock.sendto(ack.to_bytes(), addr)
+            #except socket.timeout:
+            #    continue
     
     duration = time.time() - start_time
     transfer_rate = total_bytes / (1024 * duration) if duration > 0 else 0
