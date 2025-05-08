@@ -107,7 +107,7 @@ def selective_repeat_send(sock, addr, filepath):
                     logging.info("EOF acknowledged")
                     break
             except socket.timeout:
-                logging.warning(f"EOF ACK timeout, retrying ({eof_ack_recv_tries+1}/3)")
+                logging.warning(f"EOF ACK timeout, retrying ({eof_ack_recv_tries + 1}/3)")
                 sock.sendto(Package(eof_seq, True, b"").to_bytes(), addr)
                 eof_ack_recv_tries += 1
 

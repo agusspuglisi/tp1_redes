@@ -121,7 +121,7 @@ def server_handle_request(sock, data, addr, storage_dir, protocol):
                 transfer_rate = (total_bytes / 1024) / duration if duration > 0 else 0
 
                 logging.info(
-                    f"Download complete: '{filename}', {total_bytes/1024:.2f} KB, {transfer_rate:.2f} KB/s"
+                    f"Download complete: '{filename}', {total_bytes / 1024:.2f} KB, {transfer_rate:.2f} KB/s"
                 )
 
         except Exception as e:
