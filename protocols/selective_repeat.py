@@ -6,7 +6,7 @@ from protocols.package import Package
 
 WINDOW_SIZE = 8
 CHUNK_SIZE = 4096
-TIMEOUT = 0.2  # segundos
+TIMEOUT = 0.15  # segundos
 HEADER_SIZE = 2
 SEQ_MODULO = 2 * WINDOW_SIZE
 

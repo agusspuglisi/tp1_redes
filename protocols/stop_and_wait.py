@@ -13,7 +13,7 @@ from protocols.package import Package
 import logging
 import time
 
-TIMEOUT = 0.1
+TIMEOUT = 0.15
 CHUCK_SIZE = 4096
 
 
@@ -23,6 +23,7 @@ def stop_and_wait_send(sock, addr, filepath):
     retransmissions = 0
     total_bytes = 0
     start_time = time.time()
+    eof_sent = False
 
     logging.info(f"Starting file transfer using Stop & Wait protocol: {filepath}")
 
@@ -35,6 +36,7 @@ def stop_and_wait_send(sock, addr, filepath):
                 total_bytes += len(data)
                 logging.debug(f"Sending packet seq={seq_num}, size={len(data)} bytes")
             else:
+                eof_sent = True
                 logging.info("Sending EOF packet")
 
             attempts = 0
@@ -58,7 +60,9 @@ def stop_and_wait_send(sock, addr, filepath):
                         logging.warning(
                             f"Timeout occurred, retransmitting packet {seq_num} (attempt {attempts})"
                         )
-                    continue
+                        continue
+                    elif eof_sent:
+                        break
 
             if not data:
                 break
