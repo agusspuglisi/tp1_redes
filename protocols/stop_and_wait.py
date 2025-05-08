@@ -13,7 +13,7 @@ from protocols.package import Package
 import logging 
 import time
 
-TIMEOUT = 0.25
+TIMEOUT = 0.1
 CHUCK_SIZE = 4096
 
 def stop_and_wait_send(sock, addr, filepath):

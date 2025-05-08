@@ -6,7 +6,7 @@ from protocols.package import Package
 
 WINDOW_SIZE = 8
 CHUNK_SIZE = 4096
-TIMEOUT = 0.5  # segundos
+TIMEOUT = 0.2  # segundos
 HEADER_SIZE = 2
 SEQ_MODULO = 2 * WINDOW_SIZE
 
@@ -44,9 +44,10 @@ def selective_repeat_send(sock, addr, filepath):
                     eof_seq = next_seq
                     packet = Package(next_seq, True, b'')
                 else:
-                    total_bytes += len(data)
+                    #total_bytes += len(data)
+                    
                     packet = Package(next_seq, False, data)
-        
+                    total_bytes+=len(packet.to_bytes())
                     current_time = time.time()
                     if current_time - last_log_time > 2.0: 
                         logging.info(f"Window: {len(buffer)}/{WINDOW_SIZE}, Base: {seq_base}, Next: {next_seq}, Bytes: {total_bytes}")
@@ -74,6 +75,8 @@ def selective_repeat_send(sock, addr, filepath):
                         retransmissions += 1
                         logging.debug(f"Timeout for packet {seq}, retransmitting")
                         sock.sendto(buffer[seq].to_bytes(), addr)
+                        total_bytes+=len(buffer[seq].to_bytes())
+
                         timers[seq] = time.time() # si se retrasmite, reinicia el timer
 
                 # desliza la ventana
@@ -131,7 +134,8 @@ def selective_repeat_receive(sock, addr, filepath):
             try:
                 raw_data, sender = sock.recvfrom(CHUNK_SIZE + HEADER_SIZE)
                 packet = Package.from_bytes(raw_data)
-                
+                total_bytes+=len(packet.to_bytes())
+
                 seq = packet.seq_num
                 
                 # envia ack siempre
@@ -147,6 +151,9 @@ def selective_repeat_receive(sock, addr, filepath):
                     if seq == expected_base:
                         sock.sendto(Package(eof_seq, True, b'').to_bytes(), addr)
                         logging.info("All data received before EOF, transfer complete")
+                        duration = time.time() - start_time
+                        transfer_rate = total_bytes / (1024 * duration) if duration > 0 else 0
+                        return total_bytes, duration, duplicate_packets
                         break   # Ya se recibio todo lo anterior en orden
                     else:
                         logging.info("Waiting for remaining packets before EOF")
@@ -154,6 +161,8 @@ def selective_repeat_receive(sock, addr, filepath):
 
                 # Guardo cualquier paquete valido en received
                 if (seq - expected_base + SEQ_MODULO) % SEQ_MODULO < WINDOW_SIZE:
+                    if (seq in received):
+                        duplicate_packets+=1
                     received[seq] = packet.data
 
                 
