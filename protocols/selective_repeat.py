@@ -15,7 +15,7 @@ SEQ_MODULO = 2 * WINDOW_SIZE
 
 def selective_repeat_send(sock, addr, filepath):
     sock.settimeout(TIMEOUT)
-    seq_base = 0
+    seq_base = 0#primer elemento
     next_seq = 0
     buffer = {}  # Contiene los paquetes enviados pero pendientes de confirmacion
     timers = {}
@@ -28,13 +28,14 @@ def selective_repeat_send(sock, addr, filepath):
     retransmissions = 0
     start_time = time.time()
     last_log_time = start_time
-    
+    condicion_corte=False
     logging.info(f"Starting file transfer using Selective Repeat protocol: {filepath}")
 
     with open(filepath, 'rb') as f:
-        while not eof_sent or len(buffer) > 0:  # seq_base < next_seq
-            # solo envia si nuevos paquetes si hay lugar en la ventana / envia hasta llenar ventana
+        #while not eof_sent or len(buffer) > 0:  # seq_base < next_seq
+        while not (condicion_corte):
             
+            # solo envia si nuevos paquetes si hay lugar en la ventana / envia hasta llenar ventana
             while len(buffer) < WINDOW_SIZE and not eof_sent:
                 data = f.read(CHUNK_SIZE)
                 if not data:
@@ -57,7 +58,8 @@ def selective_repeat_send(sock, addr, filepath):
                 next_seq = (next_seq + 1) % SEQ_MODULO
 
             # escuchar ack´s
-            if not eof_sent:
+            if not condicion_corte:
+
                 try:
                     raw_ack, _ = sock.recvfrom(HEADER_SIZE)
                     ack_packet = Package.from_bytes(raw_ack)
@@ -80,6 +82,7 @@ def selective_repeat_send(sock, addr, filepath):
                     del timers[seq_base]
                     acks_received.remove(seq_base)
                     seq_base = (seq_base + 1) % SEQ_MODULO
+                    condicion_corte=not buffer and eof_sent
                     logging.debug(f"Window base advanced to {seq_base}")
             else:
                 break
@@ -178,4 +181,5 @@ def selective_repeat_receive(sock, addr, filepath):
                         
             except socket.timeout:
                 continue
-           
+
+
