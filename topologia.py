@@ -1,9 +1,9 @@
-from typing import Any, cast
 from mininet.cli import CLI
 from mininet.log import setLogLevel
 from mininet.net import Mininet
 from mininet.topo import Topo
-from mininet.link import TCLink 
+from mininet.link import TCLink
+
 
 class Topo(Topo):
     def build(self, **_opts):
@@ -13,14 +13,11 @@ class Topo(Topo):
 
         self.addLink(h1, s1, cls=TCLink, loss=10)
         self.addLink(h2, s1, cls=TCLink)
-        
-        
-        
 
 
 def run():
     topo = Topo()
-    net = Mininet(topo=topo,link=TCLink)
+    net = Mininet(topo=topo, link=TCLink)
     net.start()
 
     CLI(net)
