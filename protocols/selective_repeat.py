@@ -23,6 +23,7 @@ def selective_repeat_send(sock, addr, filepath):
     acks_received = set()
     eof_sent = False
     eof_seq = None  # Me guardo el numero del EOF para enviarlo al final
+    eof_reached = False
 
     total_bytes = 0
     retransmissions = 0
@@ -36,16 +37,13 @@ def selective_repeat_send(sock, addr, filepath):
         while not (condicion_corte):
 
             # solo envia si nuevos paquetes si hay lugar en la ventana / envia hasta llenar ventana
-            while len(buffer) < WINDOW_SIZE and not eof_sent:
+            while len(buffer) < WINDOW_SIZE and not eof_reached:
                 data = f.read(CHUNK_SIZE)
-                if not data:
-                    logging.info(f"EOF reached, sending EOF packet with seq={next_seq}")
-                    eof_sent = True
+                if not data and not eof_reached:
+                    eof_reached = True
                     eof_seq = next_seq
-                    packet = Package(next_seq, True, b"")
+                    break
                 else:
-                    # total_bytes += len(data)
-
                     packet = Package(next_seq, False, data)
                     total_bytes += len(packet.to_bytes())
                     current_time = time.time()
@@ -56,11 +54,21 @@ def selective_repeat_send(sock, addr, filepath):
                             + f"Bytes: {total_bytes}"
                         )
                         last_log_time = current_time
+                    sock.sendto(packet.to_bytes(), addr)
+                    buffer[next_seq] = packet
+                    timers[next_seq] = time.time()  # inicia timer
+                    next_seq = (next_seq + 1) % SEQ_MODULO
 
-                sock.sendto(packet.to_bytes(), addr)
-                buffer[next_seq] = packet
-                timers[next_seq] = time.time()  # inicia timer
-                next_seq = (next_seq + 1) % SEQ_MODULO
+            if eof_reached:
+                if len(buffer) > 0:
+                    for seq in buffer.keys():
+                        sock.sendto(buffer[seq].to_bytes(), addr)                    
+                else:
+                    logging.info(f"EOF reached, sending EOF packet with seq={eof_seq}")
+                    eof_sent = True
+                    pack = Package(eof_seq, True, b"")
+                    sock.sendto(pack.to_bytes(), addr)
+                    condicion_corte = True
 
             # escuchar ack´s
             if not condicion_corte:
